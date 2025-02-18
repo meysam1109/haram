@@ -17,12 +17,13 @@ jobs:
     steps:
       - name: تنظیم فضای Swap برای بهبود عملکرد
         run: |
+          set -e
           sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
           free -h
-          echo "Swap setup complete"
+          echo "✅ Swap setup complete"
 
       - name: بررسی و بازیابی کش ccache
         uses: actions/cache@v3
@@ -35,23 +36,28 @@ jobs:
 
       - name: بررسی اتصال به مخازن
         run: |
-          ping -c 3 archive.ubuntu.com || echo "⚠️ هشدار: مخازن Ubuntu در دسترس نیستند"
-          ping -c 3 security.ubuntu.com || echo "⚠️ هشدار: مخازن امنیتی در دسترس نیستند"
+          set -e
+          ping -c 3 archive.ubuntu.com || (echo "❌ مخازن Ubuntu در دسترس نیستند" && exit 1)
+          ping -c 3 security.ubuntu.com || (echo "❌ مخازن امنیتی در دسترس نیستند" && exit 1)
 
       - name: پاکسازی و بروزرسانی APT
         run: |
+          set -e
           sudo apt clean
           sudo rm -rf /var/lib/apt/lists/*
           sudo apt update || sudo apt update --fix-missing
+          sudo apt upgrade -y || true
 
       - name: حل مشکلات احتمالی dpkg
         run: |
+          set -e
           sudo dpkg --configure -a || true
           sudo apt install -f -y || true
 
       - name: نصب ابزارهای موردنیاز
         run: |
-          sudo apt install -y --no-install-recommends \
+          set -e
+          sudo DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends \
               openjdk-17-jdk bc curl repo git-core \
               gnupg flex bison gperf build-essential zip \
               zlib1g-dev libc6-dev libncurses5-dev \
@@ -59,28 +65,43 @@ jobs:
               libxml2-utils xsltproc unzip python3 python3-pip \
               android-tools-mkbootimg wget ccache simg2img lz4 || \
               (echo "❌ نصب بسته‌ها شکست خورد" && exit 1)
+          echo "✅ نصب بسته‌ها با موفقیت انجام شد"
+
+      - name: بررسی وضعیت نصب
+        run: |
+          dpkg --get-selections | grep -v deinstall
 
       - name: دانلود و استخراج MIUI Fastboot
         run: |
+          set -e
           mkdir -p miui_rom
           cd miui_rom
-          wget -O miui_fastboot_rom.tgz "https://bigota.d.miui.com/V14.0.6.0.TKPMIXM/chopin_global_images_V14.0.6.0.TKPMIXM_20240528.0000.00_13.0_global_253b98dc56.tgz"
-          tar -xvf miui_fastboot_rom.tgz --strip-components=1
+          wget -O miui_fastboot_rom.tgz "https://bigota.d.miui.com/V14.0.6.0.TKPMIXM/chopin_global_images_V14.0.6.0.TKPMIXM_20240528.0000.00_13.0_global_253b98dc56.tgz" || \
+              (echo "❌ دانلود MIUI Fastboot ناموفق بود" && exit 1)
+          tar -xvf miui_fastboot_rom.tgz --strip-components=1 || \
+              (echo "❌ استخراج MIUI Fastboot ناموفق بود" && exit 1)
+          echo "✅ دانلود و استخراج MIUI Fastboot موفقیت‌آمیز بود"
 
       - name: استخراج کرنل، وندر و فریمور
         run: |
+          set -e
           mkdir -p extracted/
           cd miui_rom
-          simg2img super.img super.raw.img
+          simg2img super.img super.raw.img || \
+              (echo "❌ تبدیل super.img به raw ناموفق بود" && exit 1)
           mkdir super_extracted && cd super_extracted
-          7z x ../super.raw.img -o.
+          7z x ../super.raw.img -o. || \
+              (echo "❌ استخراج super.raw.img ناموفق بود" && exit 1)
 
           mkdir -p ../../vendor && mv system/vendor ../../vendor/
           mkdir -p ../../firmware && mv system/firmware ../../firmware/
           mkdir -p ../../kernel && mv boot.img ../../kernel/
+          echo "✅ استخراج کرنل، وندر و فریمور انجام شد"
 
       - name: تنظیم مسیرهای ساخت
         run: |
+          set -e
           echo "KERNEL_DIR=$(pwd)/kernel" >> $GITHUB_ENV
           echo "VENDOR_DIR=$(pwd)/vendor" >> $GITHUB_ENV
           echo "FIRMWARE_DIR=$(pwd)/firmware" >> $GITHUB_ENV
+          echo "✅ مسیرهای ساخت تنظیم شدند"
