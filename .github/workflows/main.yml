@@ -17,29 +17,48 @@ jobs:
     steps:
       - name: تنظیم فضای Swap برای بهبود عملکرد
         run: |
-          sudo fallocate -l 8G /swapfile
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
+          free -h
           echo "Swap setup complete"
 
       - name: بررسی و بازیابی کش ccache
         uses: actions/cache@v3
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ github.run_id }}
+          key: ccache-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             ccache-${{ runner.os }}-
+            ccache-
+
+      - name: بررسی اتصال به مخازن
+        run: |
+          ping -c 3 archive.ubuntu.com || echo "⚠️ هشدار: مخازن Ubuntu در دسترس نیستند"
+          ping -c 3 security.ubuntu.com || echo "⚠️ هشدار: مخازن امنیتی در دسترس نیستند"
+
+      - name: پاکسازی و بروزرسانی APT
+        run: |
+          sudo apt clean
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo apt update || sudo apt update --fix-missing
+
+      - name: حل مشکلات احتمالی dpkg
+        run: |
+          sudo dpkg --configure -a || true
+          sudo apt install -f -y || true
 
       - name: نصب ابزارهای موردنیاز
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk bc curl repo git-core \
-                              gnupg flex bison gperf build-essential zip \
-                              zlib1g-dev libc6-dev libncurses5-dev \
-                              x11proto-core-dev libx11-dev libgl1-mesa-dev \
-                              libxml2-utils xsltproc unzip python3 python3-pip \
-                              android-tools-mkbootimg wget ccache simg2img lz4
+          sudo apt install -y --no-install-recommends \
+              openjdk-17-jdk bc curl repo git-core \
+              gnupg flex bison gperf build-essential zip \
+              zlib1g-dev libc6-dev libncurses5-dev \
+              x11proto-core-dev libx11-dev libgl1-mesa-dev \
+              libxml2-utils xsltproc unzip python3 python3-pip \
+              android-tools-mkbootimg wget ccache simg2img lz4 || \
+              (echo "❌ نصب بسته‌ها شکست خورد" && exit 1)
 
       - name: دانلود و استخراج MIUI Fastboot
         run: |
