@@ -1,3 +1,14 @@
+name: Build ROM
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
   build_rom:
     runs-on: ubuntu-latest
@@ -6,15 +17,11 @@ jobs:
     steps:
       - name: تنظیم فضای Swap برای بهبود عملکرد
         run: |
-          if [[ $(swapon --show) ]]; then
-            echo "Swap قبلاً فعال است."
-          else
-            sudo fallocate -l 8G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
-            echo "Swap setup complete"
-          fi
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "Swap setup complete"
 
       - name: بررسی و بازیابی کش ccache
         uses: actions/cache@v3
@@ -23,7 +30,6 @@ jobs:
           key: ccache-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             ccache-${{ runner.os }}-
-        continue-on-error: true
 
       - name: نصب ابزارهای موردنیاز
         run: |
@@ -40,9 +46,6 @@ jobs:
           mkdir -p miui_rom
           cd miui_rom
           wget -O miui_fastboot_rom.tgz "https://bigota.d.miui.com/V14.0.6.0.TKPMIXM/chopin_global_images_V14.0.6.0.TKPMIXM_20240528.0000.00_13.0_global_253b98dc56.tgz"
-          if [[ ! -f miui_fastboot_rom.tgz ]]; then
-            echo "فایل MIUI دانلود نشد!" && exit 1
-          fi
           tar -xvf miui_fastboot_rom.tgz --strip-components=1
 
       - name: استخراج کرنل، وندر و فریمور
@@ -56,12 +59,6 @@ jobs:
           mkdir -p ../../vendor && mv system/vendor ../../vendor/
           mkdir -p ../../firmware && mv system/firmware ../../firmware/
           mkdir -p ../../kernel && mv boot.img ../../kernel/
-
-      - name: بررسی استخراج صحیح
-        run: |
-          if [[ ! -d "vendor" || ! -d "firmware" || ! -f "kernel/boot.img" ]]; then
-            echo "استخراج MIUI ROM ناموفق بود!" && exit 1
-          fi
 
       - name: تنظیم مسیرهای ساخت
         run: |
