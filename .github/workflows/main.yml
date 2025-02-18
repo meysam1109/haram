@@ -70,10 +70,10 @@ jobs:
               (echo "❌ نصب بسته‌ها شکست خورد" && exit 1)
           echo "✅ نصب بسته‌های اصلی انجام شد"
 
-      - name: نصب mkbootimg از PPA
+      - name: نصب mkbootimg از PPA جدید
         run: |
           set -e
-          sudo add-apt-repository -y ppa:phablet-team/tools
+          sudo add-apt-repository -y ppa:ubuntuhandbook1/mkbootimg
           sudo apt update
           sudo apt install -y android-tools-mkbootimg || \
               (echo "❌ نصب mkbootimg شکست خورد" && exit 1)
